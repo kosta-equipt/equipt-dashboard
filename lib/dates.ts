@@ -19,28 +19,36 @@ function startOfDayUTC(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
 
-/**
- * Dates written without a year are ambiguous — "Aug 28" in April could be
- * this year (future) or last year (past). For a planner mixing a short
- * future scheduling window with a long historical record, we assume
- * current year unless the date is MORE than ~6 months in the future,
- * which is far beyond a reasonable scheduling horizon.
- */
-function rollBackIfFarFuture(d: Date, reference: Date) {
+function rollBackIfInFuture(d: Date, reference: Date, bias: DateBias) {
   const sixMonthsMs = 180 * 24 * 60 * 60 * 1000
-  if (d.getTime() > reference.getTime() + sixMonthsMs) {
+  const oneDayMs = 24 * 60 * 60 * 1000
+  const threshold =
+    bias === 'past'
+      ? reference.getTime() + oneDayMs
+      : reference.getTime() + sixMonthsMs
+  if (d.getTime() > threshold) {
     d.setUTCFullYear(d.getUTCFullYear() - 1)
   }
 }
 
+export type DateBias = 'upcoming' | 'past'
+
 /**
  * Parse a sheet date string like "Apr 20", "Apr 20, 2026", "2026-04-20",
- * or "20/04/2026". When no year is supplied, assume current year; if the
- * resulting date is more than a day in the future, roll it back a year —
- * sheets with mixed history + near-term scheduling usually mean "last year"
- * for future-looking bare dates like "Aug 28" viewed in April.
+ * or "20/04/2026". When no year is supplied, assume current year; if
+ * that puts the date implausibly in the future, roll back a year.
+ *
+ * Bias controls the threshold:
+ * - "upcoming" (default): keep this year unless >6 months in the future
+ *   (matches short scheduling horizons in a content planner).
+ * - "past": roll back the moment the date is even a day in the future
+ *   (for tabs that only hold historical data).
  */
-export function parseSheetDate(raw: unknown, reference: Date = new Date()): Date | null {
+export function parseSheetDate(
+  raw: unknown,
+  reference: Date = new Date(),
+  bias: DateBias = 'upcoming',
+): Date | null {
   if (raw === null || raw === undefined) return null
   const s = String(raw).trim()
   if (!s) return null
@@ -69,7 +77,7 @@ export function parseSheetDate(raw: unknown, reference: Date = new Date()): Date
     if (mi < 0) return null
     const y = year ? Number(year) : reference.getUTCFullYear()
     const d = new Date(Date.UTC(y, mi, Number(day)))
-    if (!year) rollBackIfFarFuture(d, reference)
+    if (!year) rollBackIfInFuture(d, reference, bias)
     return d
   }
 
@@ -81,7 +89,7 @@ export function parseSheetDate(raw: unknown, reference: Date = new Date()): Date
     if (mi < 0) return null
     const y = year ? Number(year) : reference.getUTCFullYear()
     const d = new Date(Date.UTC(y, mi, Number(day)))
-    if (!year) rollBackIfFarFuture(d, reference)
+    if (!year) rollBackIfInFuture(d, reference, bias)
     return d
   }
 

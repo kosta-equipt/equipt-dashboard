@@ -244,7 +244,7 @@ export async function getHistory(): Promise<{
   const data: HistoryPost[] = parsed
     .map((row): HistoryPost | null => {
       const rawDate = row['Date'] ?? ''
-      const parsedDate = parseSheetDate(rawDate, today)
+      const parsedDate = parseSheetDate(rawDate, today, 'past')
       if (!parsedDate) return null
       return {
         date: rawDate,
