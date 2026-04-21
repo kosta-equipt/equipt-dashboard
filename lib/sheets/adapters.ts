@@ -1,8 +1,16 @@
 import 'server-only'
 import { cachedRange } from './cache'
 import { isSheetsConfigured } from './client'
+import {
+  dayLabel,
+  isTodayOrFuture,
+  monthKey,
+  monthLabel,
+  parseSheetDate,
+} from '@/lib/dates'
 import type {
   CommandCentreKpis,
+  HistoryPost,
   PerformancePoint,
   PlannerRow,
 } from '@/types/sheets'
@@ -73,12 +81,6 @@ function looksNumeric(s: string): boolean {
   return /^-?[\d,.\s%]+$/.test(s.trim())
 }
 
-/**
- * Look for a label in the grid and return its associated value.
- * Prefers the cell immediately below (common KPI dashboard layout),
- * falls back to the cell to the right. Skips cells that look like
- * another label so we don't return neighbouring headers as values.
- */
 function findLabelValue(rows: string[][], labels: string[]): string | null {
   const wanted = labels.map((l) => l.toLowerCase().trim())
   for (let r = 0; r < rows.length; r++) {
@@ -87,18 +89,14 @@ function findLabelValue(rows: string[][], labels: string[]): string | null {
       const cell = normaliseCell(row[c]).toLowerCase()
       if (!cell || !wanted.includes(cell)) continue
 
-      // Look below in the same column first.
       for (let rr = r + 1; rr < Math.min(rows.length, r + 4); rr++) {
         const v = normaliseCell(rows[rr]?.[c])
         if (v && looksNumeric(v)) return v
       }
-      // Then look to the right in the same row, but skip non-numeric
-      // cells that are probably adjacent labels.
       for (let cc = c + 1; cc < row.length; cc++) {
         const v = normaliseCell(row[cc])
         if (!v) continue
         if (looksNumeric(v)) return v
-        // Stop if we've hit another label-like cell.
         break
       }
     }
@@ -148,7 +146,6 @@ export async function getPerformance(): Promise<{
     `${q(TAB_PERFORMANCE)}!A1:Z500`,
   )
 
-  // Find the real detail header row (must contain Date + Reach columns).
   const parsed = parseTable(rows, ['Date', 'Reach'])
 
   const data: PerformancePoint[] = parsed
@@ -172,7 +169,7 @@ export async function getPerformance(): Promise<{
       }
     })
     .filter((p): p is PerformancePoint => p !== null)
-    .reverse() // Sheet lists newest-first; chart wants oldest-first.
+    .reverse()
 
   return { data, fetchedAt, configured: true }
 }
@@ -192,33 +189,79 @@ export async function getContentCalendar(): Promise<{
   )
 
   const parsed = parseTable(rows, ['Date', 'Post'])
+  const today = new Date()
 
-  const data: PlannerRow[] = parsed.map((row) => {
-    const topic =
-      row['Post'] ??
-      row['Post Topic/Caption'] ??
-      row['Topic'] ??
-      row['Caption'] ??
-      row['Idea/Topic'] ??
-      ''
-    const platform =
-      row['Platforms'] ?? row['Platform'] ?? ''
-    const status = (row['Status'] ?? row['Done'] ?? '').toLowerCase()
-    const done = /^(published|posted|done|complete|yes|y|true|✓|x)$/i.test(
-      status,
+  const data: PlannerRow[] = parsed
+    .map((row) => {
+      const topic =
+        row['Post'] ??
+        row['Post Topic/Caption'] ??
+        row['Topic'] ??
+        row['Caption'] ??
+        row['Idea/Topic'] ??
+        ''
+      const platform = row['Platforms'] ?? row['Platform'] ?? ''
+      const rawDate = row['Date'] ?? ''
+      const parsedDate = parseSheetDate(rawDate, today)
+
+      return {
+        parsedDate,
+        row: {
+          day: row['Day'] ?? (parsedDate ? dayLabel(parsedDate) : ''),
+          date: rawDate,
+          topic,
+          platform,
+        },
+      }
+    })
+    .filter(
+      (x): x is { parsedDate: Date; row: PlannerRow } =>
+        x.parsedDate !== null && isTodayOrFuture(x.parsedDate, today),
     )
-    const notes = row['Caption'] ?? row['Notes/Details'] ?? row['Notes'] ?? ''
-    return {
-      day: row['Day'] ?? '',
-      date: row['Date'] ?? '',
-      topic,
-      platform,
-      type: row['Type'] ?? row['Campaign'] ?? '',
-      priority: row['Priority'] ?? row['Objective'] ?? '',
-      notes,
-      done,
-    }
-  })
+    .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime())
+    .map((x) => x.row)
+
+  return { data, fetchedAt, configured: true }
+}
+
+export async function getHistory(): Promise<{
+  data: HistoryPost[]
+  fetchedAt: string
+  configured: boolean
+}> {
+  if (!isSheetsConfigured()) {
+    return { data: [], fetchedAt: new Date().toISOString(), configured: false }
+  }
+
+  const { rows, fetchedAt } = await cachedRange(
+    ['history'],
+    `${q(TAB_PERFORMANCE)}!A1:Z500`,
+  )
+
+  const parsed = parseTable(rows, ['Date', 'Reach'])
+  const today = new Date()
+
+  const data: HistoryPost[] = parsed
+    .map((row): HistoryPost | null => {
+      const rawDate = row['Date'] ?? ''
+      const parsedDate = parseSheetDate(rawDate, today)
+      if (!parsedDate) return null
+      return {
+        date: rawDate,
+        dateIso: parsedDate.toISOString(),
+        monthKey: monthKey(parsedDate),
+        monthLabel: monthLabel(parsedDate),
+        platform: row['Platform'] ?? '',
+        type: row['Type'] ?? '',
+        topic: row['Post'] ?? row['Topic'] ?? row['Caption'] ?? '',
+        reach: toNumber(row['Reach'] ?? '') ?? 0,
+        engagement: toNumber(row['Engagement'] ?? '') ?? 0,
+        likes: toNumber(row['Likes'] ?? '') ?? 0,
+        link: row['Link'] ?? row['URL'] ?? '',
+      }
+    })
+    .filter((p): p is HistoryPost => p !== null)
+    .sort((a, b) => b.dateIso.localeCompare(a.dateIso))
 
   return { data, fetchedAt, configured: true }
 }

@@ -46,9 +46,16 @@ from `tailwind.config.ts`. Do not hand-code hex values in components.
 
 | Tab name (env override) | Purpose |
 |-------------------------|---------|
-| `Dashboard` (`SHEET_TAB_COMMAND_CENTRE`) | KPI totals for the top row of the home page |
-| `Performance` (`SHEET_TAB_PERFORMANCE`) | Time-series data for trend charts |
-| `Content Calendar` (`SHEET_TAB_CONTENT_CALENDAR`) | Weekly planner rows |
+| `Dashboard` (`SHEET_TAB_COMMAND_CENTRE`) | KPI totals for the top row of the Analytics page |
+| `Performance` (`SHEET_TAB_PERFORMANCE`) | Source for both the trend charts (Analytics) and the month-by-month History accordion (Planner). Every row = one published post with metrics. |
+| `Content Calendar` (`SHEET_TAB_CONTENT_CALENDAR`) | Source for Week ahead on the Planner page. Only rows with a future-or-today date are shown. |
+
+## Planner page data contract
+
+- **Week ahead** = Content Calendar rows with `Date >= today`, sorted ascending.
+- **History** = Performance tab rows, grouped by year-month (`dayLabel`, `monthKey`, `monthLabel` come from `lib/dates.ts`), sorted newest-first.
+- No status column is required. A post is "upcoming" if its date is future; it becomes "history" once the Apps Script (`pullInstagramMetrics`) lands it in the Performance tab.
+- Dates in the sheet are bare like `Apr 20` — year is inferred by `parseSheetDate`: assume current year, subtract 1 year if that would put the date in the future.
 
 ## Rules for Claude Code
 

@@ -19,8 +19,18 @@ export type PlannerRow = {
   date: string
   topic: string
   platform: string
+}
+
+export type HistoryPost = {
+  date: string
+  dateIso: string
+  monthKey: string
+  monthLabel: string
+  platform: string
   type: string
-  priority: string
-  notes: string
-  done: boolean
+  topic: string
+  reach: number
+  engagement: number
+  likes: number
+  link: string
 }

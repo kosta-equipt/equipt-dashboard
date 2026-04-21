@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import {
   getCommandCentre,
   getContentCalendar,
+  getHistory,
   getPerformance,
 } from '@/lib/sheets/adapters'
 
@@ -19,6 +20,8 @@ export async function GET(_req: Request, { params }: Params) {
         return NextResponse.json(await getPerformance())
       case 'content-calendar':
         return NextResponse.json(await getContentCalendar())
+      case 'history':
+        return NextResponse.json(await getHistory())
       default:
         return NextResponse.json({ error: `Unknown tab: ${tab}` }, { status: 404 })
     }

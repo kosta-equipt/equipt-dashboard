@@ -2,19 +2,22 @@ import { Header } from '@/components/shell/Header'
 import { SetupNotice } from '@/components/shell/SetupNotice'
 import { SectionHeader } from '@/components/analytics/SectionHeader'
 import { WeekTable } from '@/components/planner/WeekTable'
-import { getContentCalendar } from '@/lib/sheets/adapters'
+import { HistorySection } from '@/components/planner/HistorySection'
+import { getContentCalendar, getHistory } from '@/lib/sheets/adapters'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PlannerPage() {
-  const calendar = await getContentCalendar()
-  const configured = calendar.configured
-  const doneCount = calendar.data.filter((r) => r.done).length
+  const [calendar, history] = await Promise.all([
+    getContentCalendar(),
+    getHistory(),
+  ])
+  const configured = calendar.configured && history.configured
 
   return (
     <>
       <Header fetchedAt={calendar.fetchedAt} configured={configured} />
-      <main className="mx-auto w-full max-w-7xl flex-1 space-y-10 px-6 py-10">
+      <main className="mx-auto w-full max-w-7xl flex-1 space-y-12 px-6 py-10">
         {!configured && <SetupNotice />}
 
         <section className="space-y-5">
@@ -23,11 +26,23 @@ export default async function PlannerPage() {
             title="Week ahead"
             subtitle={
               calendar.data.length
-                ? `${doneCount} of ${calendar.data.length} planned posts marked done.`
-                : 'Plan and track what is scheduled. Edits land in the Content Calendar tab.'
+                ? `${calendar.data.length} post${calendar.data.length === 1 ? '' : 's'} coming up, nearest first.`
+                : 'Future-dated rows in the Content Calendar tab will appear here.'
             }
           />
           <WeekTable rows={calendar.data} />
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-wider2 text-muted">
+              History
+            </h2>
+            <span className="text-xs text-muted">
+              {history.data.length} post{history.data.length === 1 ? '' : 's'} on record
+            </span>
+          </div>
+          <HistorySection posts={history.data} />
         </section>
       </main>
     </>
