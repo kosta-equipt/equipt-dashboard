@@ -28,3 +28,6 @@ next-env.d.ts
 
 # archive from the old Vite build — kept locally, never committed
 archive
+
+# claude code session data — never commit
+.claude/
