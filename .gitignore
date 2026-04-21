@@ -1,4 +1,30 @@
+# dependencies
 node_modules
+.pnp
+.pnp.js
+
+# next.js
+.next
+out
+
+# production
+build
 dist
+
+# env
+.env
+.env.local
+.env.*.local
+
+# misc
 .DS_Store
-*.local
+*.pem
+.vercel
+next-env.d.ts
+
+# ide
+.idea
+.vscode
+
+# archive from the old Vite build — kept locally, never committed
+archive
