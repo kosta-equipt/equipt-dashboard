@@ -46,7 +46,7 @@ from `tailwind.config.ts`. Do not hand-code hex values in components.
 
 | Tab name (env override) | Purpose |
 |-------------------------|---------|
-| `EQUIPT — Command Centre` (`SHEET_TAB_COMMAND_CENTRE`) | KPI totals for the top row of the home page |
+| `Dashboard` (`SHEET_TAB_COMMAND_CENTRE`) | KPI totals for the top row of the home page |
 | `Performance` (`SHEET_TAB_PERFORMANCE`) | Time-series data for trend charts |
 | `Content Calendar` (`SHEET_TAB_CONTENT_CALENDAR`) | Weekly planner rows |
 

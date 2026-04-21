@@ -8,18 +8,18 @@ import type {
 } from '@/types/sheets'
 
 const TAB_COMMAND_CENTRE =
-  process.env.SHEET_TAB_COMMAND_CENTRE ?? 'EQUIPT — Command Centre'
+  process.env.SHEET_TAB_COMMAND_CENTRE ?? 'Dashboard'
 const TAB_PERFORMANCE = process.env.SHEET_TAB_PERFORMANCE ?? 'Performance'
 const TAB_CONTENT_CALENDAR =
   process.env.SHEET_TAB_CONTENT_CALENDAR ?? 'Content Calendar'
 
 function q(tab: string): string {
-  // Sheets A1 notation requires quoted tab names when they contain spaces or em-dashes.
   return `'${tab.replace(/'/g, "''")}'`
 }
 
-function normaliseCell(raw: string | undefined): string {
-  return (raw ?? '').toString().trim()
+function normaliseCell(raw: unknown): string {
+  if (raw === null || raw === undefined) return ''
+  return String(raw).trim()
 }
 
 function toNumber(raw: string): number | null {
@@ -29,7 +29,17 @@ function toNumber(raw: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function findHeaderRowIndex(rows: string[][]): number {
+function findHeaderRowIndex(
+  rows: string[][],
+  requiredLabels: string[] = [],
+): number {
+  const required = requiredLabels.map((l) => l.toLowerCase())
+  if (required.length) {
+    for (let i = 0; i < rows.length; i++) {
+      const lc = rows[i].map((c) => normaliseCell(c).toLowerCase())
+      if (required.every((r) => lc.includes(r))) return i
+    }
+  }
   for (let i = 0; i < rows.length; i++) {
     const filled = rows[i].filter((c) => normaliseCell(c)).length
     if (filled >= 2) return i
@@ -37,9 +47,12 @@ function findHeaderRowIndex(rows: string[][]): number {
   return 0
 }
 
-export function parseTable(rows: string[][]): Record<string, string>[] {
+function parseTable(
+  rows: string[][],
+  requiredLabels: string[] = [],
+): Record<string, string>[] {
   if (!rows.length) return []
-  const headerIdx = findHeaderRowIndex(rows)
+  const headerIdx = findHeaderRowIndex(rows, requiredLabels)
   const headers = rows[headerIdx].map((h) => normaliseCell(h))
   const out: Record<string, string>[] = []
   for (let i = headerIdx + 1; i < rows.length; i++) {
@@ -56,17 +69,26 @@ export function parseTable(rows: string[][]): Record<string, string>[] {
   return out
 }
 
+/**
+ * Look for a label in the grid and return its associated value.
+ * Checks the cell to the right, then the cell below, then further in
+ * the same row / column until a value is found.
+ */
 function findLabelValue(rows: string[][], labels: string[]): string | null {
   const wanted = labels.map((l) => l.toLowerCase().trim())
-  for (const row of rows) {
-    for (let i = 0; i < row.length; i++) {
-      const cell = normaliseCell(row[i]).toLowerCase()
-      if (!cell) continue
-      if (wanted.includes(cell)) {
-        for (let j = i + 1; j < row.length; j++) {
-          const val = normaliseCell(row[j])
-          if (val) return val
-        }
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r] ?? []
+    for (let c = 0; c < row.length; c++) {
+      const cell = normaliseCell(row[c]).toLowerCase()
+      if (!cell || !wanted.includes(cell)) continue
+
+      for (let cc = c + 1; cc < row.length; cc++) {
+        const v = normaliseCell(row[cc])
+        if (v) return v
+      }
+      for (let rr = r + 1; rr < Math.min(rows.length, r + 4); rr++) {
+        const v = normaliseCell(rows[rr]?.[c])
+        if (v) return v
       }
     }
   }
@@ -115,14 +137,12 @@ export async function getPerformance(): Promise<{
     `${q(TAB_PERFORMANCE)}!A1:Z500`,
   )
 
-  const parsed = parseTable(rows)
+  // Find the real detail header row (must contain Date + Reach columns).
+  const parsed = parseTable(rows, ['Date', 'Reach'])
+
   const data: PerformancePoint[] = parsed
     .map((row) => {
-      const dateKey =
-        Object.keys(row).find((k) => /^date$/i.test(k)) ??
-        Object.keys(row).find((k) => /date|day|week|month/i.test(k))
-      if (!dateKey) return null
-      const date = row[dateKey]
+      const date = row['Date'] ?? row['Day'] ?? row['Week'] ?? ''
       if (!date) return null
       const reach = toNumber(row['Reach'] ?? row['Total Reach'] ?? '')
       const engagement = toNumber(
@@ -141,6 +161,7 @@ export async function getPerformance(): Promise<{
       }
     })
     .filter((p): p is PerformancePoint => p !== null)
+    .reverse() // Sheet lists newest-first; chart wants oldest-first.
 
   return { data, fetchedAt, configured: true }
 }
@@ -159,25 +180,32 @@ export async function getContentCalendar(): Promise<{
     `${q(TAB_CONTENT_CALENDAR)}!A1:Z200`,
   )
 
-  const parsed = parseTable(rows)
+  const parsed = parseTable(rows, ['Date', 'Post'])
+
   const data: PlannerRow[] = parsed.map((row) => {
     const topic =
+      row['Post'] ??
       row['Post Topic/Caption'] ??
       row['Topic'] ??
       row['Caption'] ??
-      row['Post'] ??
       row['Idea/Topic'] ??
       ''
-    const done = (row['Done'] ?? row['Status'] ?? '').toLowerCase()
+    const platform =
+      row['Platforms'] ?? row['Platform'] ?? ''
+    const status = (row['Status'] ?? row['Done'] ?? '').toLowerCase()
+    const done = /^(published|posted|done|complete|yes|y|true|✓|x)$/i.test(
+      status,
+    )
+    const notes = row['Caption'] ?? row['Notes/Details'] ?? row['Notes'] ?? ''
     return {
       day: row['Day'] ?? '',
       date: row['Date'] ?? '',
       topic,
-      platform: row['Platform'] ?? '',
-      type: row['Type'] ?? '',
-      priority: row['Priority'] ?? '',
-      notes: row['Notes/Details'] ?? row['Notes'] ?? '',
-      done: /^(yes|y|true|done|✓|x|complete)$/i.test(done),
+      platform,
+      type: row['Type'] ?? row['Campaign'] ?? '',
+      priority: row['Priority'] ?? row['Objective'] ?? '',
+      notes,
+      done,
     }
   })
 

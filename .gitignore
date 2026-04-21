@@ -31,3 +31,4 @@ archive
 
 # claude code session data — never commit
 .claude/
+.env*.local

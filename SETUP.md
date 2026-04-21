@@ -83,7 +83,7 @@ Open http://localhost:3000
 
 The dashboard reads three tabs by name. If you rename them in Google Sheets, also update these env vars (defaults in brackets):
 
-- `SHEET_TAB_COMMAND_CENTRE` *(EQUIPT — Command Centre)*
+- `SHEET_TAB_COMMAND_CENTRE` *(Dashboard)*
 - `SHEET_TAB_PERFORMANCE` *(Performance)*
 - `SHEET_TAB_CONTENT_CALENDAR` *(Content Calendar)*
 
