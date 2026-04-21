@@ -21,8 +21,8 @@ export function NavTabs() {
             href={tab.href}
             className={`rounded-full px-4 py-1.5 text-sm transition-colors ${
               active
-                ? 'bg-midnight text-bone'
-                : 'text-ink hover:bg-line/60'
+                ? 'bg-midnight text-bone dark:bg-linen dark:text-ink'
+                : 'text-ink hover:bg-line/60 dark:text-linen dark:hover:bg-line-dark/60'
             }`}
           >
             {tab.label}

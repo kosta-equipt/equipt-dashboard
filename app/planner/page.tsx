@@ -35,10 +35,10 @@ export default async function PlannerPage() {
 
         <section className="space-y-3">
           <div className="flex items-baseline justify-between">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider2 text-muted">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-wider2 text-muted dark:text-muted-dark">
               History
             </h2>
-            <span className="text-xs text-muted">
+            <span className="text-xs text-muted dark:text-muted-dark">
               {history.data.length} post{history.data.length === 1 ? '' : 's'} on record
             </span>
           </div>

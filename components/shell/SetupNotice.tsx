@@ -2,14 +2,14 @@ import { AlertCircle } from 'lucide-react'
 
 export function SetupNotice() {
   return (
-    <div className="rounded-2xl border border-gold/40 bg-gold/10 p-6 text-sm text-ink">
+    <div className="rounded-2xl border border-gold/40 bg-gold/10 p-6 text-sm text-ink dark:bg-gold/5 dark:text-linen">
       <div className="flex items-start gap-3">
         <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-gold" aria-hidden />
         <div className="space-y-2">
-          <h2 className="font-display text-base font-semibold text-midnight">
+          <h2 className="font-display text-base font-semibold text-midnight dark:text-linen">
             Google Sheets not connected yet
           </h2>
-          <p className="text-muted">
+          <p className="text-muted dark:text-muted-dark">
             The dashboard is deployed but needs three environment variables set in
             Vercel before it can pull live data:
           </p>

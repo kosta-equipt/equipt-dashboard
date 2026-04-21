@@ -12,10 +12,10 @@ export function SectionHeader({ eyebrow, title, subtitle }: SectionHeaderProps) 
           {eyebrow}
         </p>
       )}
-      <h2 className="font-display text-2xl font-semibold tracking-tightest text-midnight">
+      <h2 className="font-display text-2xl font-semibold tracking-tightest text-midnight dark:text-linen">
         {title}
       </h2>
-      {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
+      {subtitle && <p className="text-sm text-muted dark:text-muted-dark">{subtitle}</p>}
     </div>
   )
 }

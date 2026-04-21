@@ -8,7 +8,7 @@ type HistorySectionProps = {
 export function HistorySection({ posts }: HistorySectionProps) {
   if (!posts.length) {
     return (
-      <div className="rounded-2xl border border-line bg-white p-6 text-center text-xs text-muted shadow-card">
+      <div className="rounded-2xl border border-line bg-white p-6 text-center text-xs text-muted shadow-card dark:border-line-dark dark:bg-linen-dark dark:text-muted-dark">
         No historical posts yet. Entries land here automatically once metrics
         are pulled into the Performance tab.
       </div>

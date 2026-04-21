@@ -20,16 +20,16 @@ type TrendChartProps = {
 
 export function TrendChart({ title, data, dataKey, colour }: TrendChartProps) {
   return (
-    <div className="rounded-2xl border border-line bg-white p-6 shadow-card">
+    <div className="rounded-2xl border border-line bg-white p-6 shadow-card dark:border-line-dark dark:bg-linen-dark">
       <div className="mb-4 flex items-baseline justify-between">
-        <h3 className="font-display text-base font-semibold text-midnight">
+        <h3 className="font-display text-base font-semibold text-midnight dark:text-linen">
           {title}
         </h3>
-        <span className="text-xs text-muted">{data.length} points</span>
+        <span className="text-xs text-muted dark:text-muted-dark">{data.length} points</span>
       </div>
       <div className="h-64 w-full">
         {data.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted">
+          <div className="flex h-full items-center justify-center text-sm text-muted dark:text-muted-dark">
             No data yet — fill in the Performance tab to see trends.
           </div>
         ) : (

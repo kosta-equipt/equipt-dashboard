@@ -33,7 +33,7 @@ export function RefreshButton({ fetchedAt, disabled }: RefreshButtonProps) {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="hidden text-xs text-muted sm:inline">{label}</span>
+      <span className="hidden text-xs text-muted dark:text-muted-dark sm:inline">{label}</span>
       <button
         type="button"
         disabled={disabled || pending}
@@ -43,7 +43,7 @@ export function RefreshButton({ fetchedAt, disabled }: RefreshButtonProps) {
             router.refresh()
           })
         }}
-        className="inline-flex items-center gap-2 rounded-full border border-midnight/10 bg-white px-4 py-1.5 text-sm font-medium text-midnight shadow-card transition hover:border-midnight/30 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-full border border-midnight/10 bg-white px-4 py-1.5 text-sm font-medium text-midnight shadow-card transition hover:border-midnight/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-line-dark dark:bg-linen-dark dark:text-linen dark:hover:border-gold/50"
       >
         <RefreshCw
           className={`h-3.5 w-3.5 ${pending ? 'animate-spin' : ''}`}
