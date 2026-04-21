@@ -69,10 +69,15 @@ function parseTable(
   return out
 }
 
+function looksNumeric(s: string): boolean {
+  return /^-?[\d,.\s%]+$/.test(s.trim())
+}
+
 /**
  * Look for a label in the grid and return its associated value.
- * Checks the cell to the right, then the cell below, then further in
- * the same row / column until a value is found.
+ * Prefers the cell immediately below (common KPI dashboard layout),
+ * falls back to the cell to the right. Skips cells that look like
+ * another label so we don't return neighbouring headers as values.
  */
 function findLabelValue(rows: string[][], labels: string[]): string | null {
   const wanted = labels.map((l) => l.toLowerCase().trim())
@@ -82,13 +87,19 @@ function findLabelValue(rows: string[][], labels: string[]): string | null {
       const cell = normaliseCell(row[c]).toLowerCase()
       if (!cell || !wanted.includes(cell)) continue
 
-      for (let cc = c + 1; cc < row.length; cc++) {
-        const v = normaliseCell(row[cc])
-        if (v) return v
-      }
+      // Look below in the same column first.
       for (let rr = r + 1; rr < Math.min(rows.length, r + 4); rr++) {
         const v = normaliseCell(rows[rr]?.[c])
-        if (v) return v
+        if (v && looksNumeric(v)) return v
+      }
+      // Then look to the right in the same row, but skip non-numeric
+      // cells that are probably adjacent labels.
+      for (let cc = c + 1; cc < row.length; cc++) {
+        const v = normaliseCell(row[cc])
+        if (!v) continue
+        if (looksNumeric(v)) return v
+        // Stop if we've hit another label-like cell.
+        break
       }
     }
   }
