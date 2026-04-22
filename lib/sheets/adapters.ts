@@ -174,6 +174,72 @@ export async function getPerformance(): Promise<{
   return { data, fetchedAt, configured: true }
 }
 
+function isPostedStatus(raw: string): boolean {
+  const s = raw.toLowerCase().trim()
+  return (
+    s === 'posted' ||
+    s === 'published' ||
+    s === 'live' ||
+    s === 'done' ||
+    s === 'complete'
+  )
+}
+
+function splitPlatforms(raw: string): string[] {
+  const s = raw.trim()
+  if (!s) return ['']
+  if (/^both$/i.test(s)) return ['Instagram', 'Facebook']
+  return s
+    .split(/[,/&]|\s+and\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean)
+}
+
+type CalendarRowRaw = {
+  parsedDate: Date | null
+  rawDate: string
+  topic: string
+  platform: string
+  status: string
+  day: string
+}
+
+async function loadCalendarRows(): Promise<{
+  rows: CalendarRowRaw[]
+  fetchedAt: string
+}> {
+  const { rows: raw, fetchedAt } = await cachedRange(
+    ['content-calendar'],
+    `${q(TAB_CONTENT_CALENDAR)}!A1:Z200`,
+  )
+  const parsed = parseTable(raw, ['Date', 'Post'])
+  const today = new Date()
+
+  const out: CalendarRowRaw[] = parsed.map((row) => {
+    const topic =
+      row['Post'] ??
+      row['Post Topic/Caption'] ??
+      row['Topic'] ??
+      row['Caption'] ??
+      row['Idea/Topic'] ??
+      ''
+    const platform = row['Platforms'] ?? row['Platform'] ?? ''
+    const rawDate = row['Date'] ?? ''
+    const status = row['Status'] ?? row['Done'] ?? ''
+    const parsedDate = parseSheetDate(rawDate, today)
+    return {
+      parsedDate,
+      rawDate,
+      topic,
+      platform,
+      status,
+      day: row['Day'] ?? (parsedDate ? dayLabel(parsedDate) : ''),
+    }
+  })
+
+  return { rows: out, fetchedAt }
+}
+
 export async function getContentCalendar(): Promise<{
   data: PlannerRow[]
   fetchedAt: string
@@ -183,45 +249,29 @@ export async function getContentCalendar(): Promise<{
     return { data: [], fetchedAt: new Date().toISOString(), configured: false }
   }
 
-  const { rows, fetchedAt } = await cachedRange(
-    ['content-calendar'],
-    `${q(TAB_CONTENT_CALENDAR)}!A1:Z200`,
-  )
-
-  const parsed = parseTable(rows, ['Date', 'Post'])
+  const { rows, fetchedAt } = await loadCalendarRows()
   const today = new Date()
 
-  const data: PlannerRow[] = parsed
-    .map((row) => {
-      const topic =
-        row['Post'] ??
-        row['Post Topic/Caption'] ??
-        row['Topic'] ??
-        row['Caption'] ??
-        row['Idea/Topic'] ??
-        ''
-      const platform = row['Platforms'] ?? row['Platform'] ?? ''
-      const rawDate = row['Date'] ?? ''
-      const parsedDate = parseSheetDate(rawDate, today)
-
-      return {
-        parsedDate,
-        row: {
-          day: row['Day'] ?? (parsedDate ? dayLabel(parsedDate) : ''),
-          date: rawDate,
-          topic,
-          platform,
-        },
-      }
-    })
+  const data: PlannerRow[] = rows
+    .filter((r) => !isPostedStatus(r.status))
+    .map((r) => ({ parsedDate: r.parsedDate, row: r }))
     .filter(
-      (x): x is { parsedDate: Date; row: PlannerRow } =>
+      (x): x is { parsedDate: Date; row: CalendarRowRaw } =>
         x.parsedDate !== null && isTodayOrFuture(x.parsedDate, today),
     )
     .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime())
-    .map((x) => x.row)
+    .map(({ row }) => ({
+      day: row.day,
+      date: row.rawDate,
+      topic: row.topic,
+      platform: row.platform,
+    }))
 
   return { data, fetchedAt, configured: true }
+}
+
+function topicKey(topic: string): string {
+  return topic.replace(/\s+/g, ' ').trim().slice(0, 40).toLowerCase()
 }
 
 export async function getHistory(): Promise<{
@@ -233,15 +283,16 @@ export async function getHistory(): Promise<{
     return { data: [], fetchedAt: new Date().toISOString(), configured: false }
   }
 
-  const { rows, fetchedAt } = await cachedRange(
-    ['history'],
-    `${q(TAB_PERFORMANCE)}!A1:Z500`,
-  )
+  const [perfResult, calendarResult] = await Promise.all([
+    cachedRange(['history'], `${q(TAB_PERFORMANCE)}!A1:Z500`),
+    loadCalendarRows(),
+  ])
 
-  const parsed = parseTable(rows, ['Date', 'Reach'])
+  const parsedPerf = parseTable(perfResult.rows, ['Date', 'Reach'])
   const today = new Date()
 
-  const data: HistoryPost[] = parsed
+  // 1. Build the base history from the Performance tab (rows with metrics).
+  const fromPerformance: HistoryPost[] = parsedPerf
     .map((row): HistoryPost | null => {
       const rawDate = row['Date'] ?? ''
       const parsedDate = parseSheetDate(rawDate, today, 'past')
@@ -258,12 +309,60 @@ export async function getHistory(): Promise<{
         engagement: toNumber(row['Engagement'] ?? '') ?? 0,
         likes: toNumber(row['Likes'] ?? '') ?? 0,
         link: row['Link'] ?? row['URL'] ?? '',
+        pending: false,
       }
     })
     .filter((p): p is HistoryPost => p !== null)
-    .sort((a, b) => b.dateIso.localeCompare(a.dateIso))
 
-  return { data, fetchedAt, configured: true }
+  // 2. Index Performance rows by (day key + platform + topic key) so we can
+  // detect which Content Calendar Posted rows are already covered.
+  const coveredKeys = new Set<string>()
+  for (const p of fromPerformance) {
+    const dayKey = p.dateIso.slice(0, 10)
+    const tk = topicKey(p.topic)
+    coveredKeys.add(`${dayKey}|${p.platform.toLowerCase()}|${tk}`)
+    // Also index without topic so we don't double-surface when captions differ.
+    coveredKeys.add(`${dayKey}|${p.platform.toLowerCase()}|*`)
+  }
+
+  // 3. For every Content Calendar row marked Posted, emit a per-platform
+  // pending entry unless Performance already has a matching row.
+  const pending: HistoryPost[] = []
+  for (const r of calendarResult.rows) {
+    if (!isPostedStatus(r.status)) continue
+    if (!r.parsedDate) continue
+    const dayKey = r.parsedDate.toISOString().slice(0, 10)
+    for (const plat of splitPlatforms(r.platform)) {
+      const platLc = plat.toLowerCase()
+      const tk = topicKey(r.topic)
+      if (coveredKeys.has(`${dayKey}|${platLc}|${tk}`)) continue
+      if (coveredKeys.has(`${dayKey}|${platLc}|*`)) continue
+      pending.push({
+        date: r.rawDate,
+        dateIso: r.parsedDate.toISOString(),
+        monthKey: monthKey(r.parsedDate),
+        monthLabel: monthLabel(r.parsedDate),
+        platform: plat,
+        type: '',
+        topic: r.topic,
+        reach: 0,
+        engagement: 0,
+        likes: 0,
+        link: '',
+        pending: true,
+      })
+    }
+  }
+
+  const data = [...fromPerformance, ...pending].sort((a, b) =>
+    b.dateIso.localeCompare(a.dateIso),
+  )
+
+  return {
+    data,
+    fetchedAt: perfResult.fetchedAt,
+    configured: true,
+  }
 }
 
 function emptyKpis(): CommandCentreKpis {

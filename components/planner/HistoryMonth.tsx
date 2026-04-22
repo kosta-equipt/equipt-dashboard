@@ -13,8 +13,13 @@ type HistoryMonthProps = {
 
 export function HistoryMonth({ label, posts }: HistoryMonthProps) {
   const [open, setOpen] = useState(false)
-  const totalReach = posts.reduce((acc, p) => acc + (p.reach || 0), 0)
-  const totalEngagement = posts.reduce((acc, p) => acc + (p.engagement || 0), 0)
+  const metricPosts = posts.filter((p) => !p.pending)
+  const totalReach = metricPosts.reduce((acc, p) => acc + (p.reach || 0), 0)
+  const totalEngagement = metricPosts.reduce(
+    (acc, p) => acc + (p.engagement || 0),
+    0,
+  )
+  const pendingCount = posts.length - metricPosts.length
 
   return (
     <div className="rounded-2xl border border-line bg-white shadow-card dark:border-line-dark dark:bg-linen-dark">
@@ -36,6 +41,7 @@ export function HistoryMonth({ label, posts }: HistoryMonthProps) {
           </span>
           <span className="text-xs text-muted dark:text-muted-dark">
             {posts.length} post{posts.length === 1 ? '' : 's'}
+            {pendingCount > 0 && ` · ${pendingCount} pending`}
           </span>
         </div>
         <div className="flex items-center gap-4 text-xs text-muted dark:text-muted-dark">

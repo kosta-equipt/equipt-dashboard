@@ -14,18 +14,20 @@ import { TrendChart } from '@/components/analytics/TrendChart'
 import { Greeting } from '@/components/analytics/Greeting'
 import { QuickActions } from '@/components/analytics/QuickActions'
 import { TopPostCard } from '@/components/analytics/TopPostCard'
+import { RecommendationsCard } from '@/components/analytics/RecommendationsCard'
 import { getCommandCentre, getPerformance } from '@/lib/sheets/adapters'
-import { getWeekInsights } from '@/lib/sheets/insights'
+import { getRecommendations, getWeekInsights } from '@/lib/sheets/insights'
 import { getDohaWeather } from '@/lib/weather'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AnalyticsPage() {
-  const [kpis, perf, insights, weather] = await Promise.all([
+  const [kpis, perf, insights, weather, recs] = await Promise.all([
     getCommandCentre(),
     getPerformance(),
     getWeekInsights(),
     getDohaWeather(),
+    getRecommendations(),
   ])
   const configured = kpis.configured && perf.configured
   const fetchedAt = kpis.fetchedAt
@@ -41,6 +43,12 @@ export default async function AnalyticsPage() {
           <Greeting name="Kosta" weather={weather} />
           <QuickActions />
         </section>
+
+        {recs.data.length > 0 && (
+          <section>
+            <RecommendationsCard recs={recs.data} />
+          </section>
+        )}
 
         <section className="space-y-5">
           <SectionHeader

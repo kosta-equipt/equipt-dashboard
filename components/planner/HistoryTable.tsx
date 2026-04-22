@@ -42,10 +42,23 @@ export function HistoryTable({ posts }: HistoryTableProps) {
                 </div>
               </td>
               <td className="px-4 py-2 text-right font-mono text-ink dark:text-linen">
-                {formatNumber(p.reach)}
+                {p.pending ? (
+                  <span
+                    className="text-muted dark:text-muted-dark"
+                    title="Metrics pending — run the pullInstagramMetrics Apps Script"
+                  >
+                    —
+                  </span>
+                ) : (
+                  formatNumber(p.reach)
+                )}
               </td>
               <td className="px-4 py-2 text-right font-mono text-ink dark:text-linen">
-                {formatNumber(p.engagement)}
+                {p.pending ? (
+                  <span className="text-muted dark:text-muted-dark">—</span>
+                ) : (
+                  formatNumber(p.engagement)
+                )}
               </td>
               <td className="px-4 py-2 text-right">
                 {p.link ? (
@@ -58,6 +71,13 @@ export function HistoryTable({ posts }: HistoryTableProps) {
                   >
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                   </Link>
+                ) : p.pending ? (
+                  <span
+                    className="inline-flex rounded-full bg-gold/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider2 text-gold"
+                    title="Metrics pending"
+                  >
+                    Pending
+                  </span>
                 ) : null}
               </td>
             </tr>
