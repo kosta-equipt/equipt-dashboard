@@ -8,9 +8,16 @@ export class SheetsConfigError extends Error {
   }
 }
 
-export function isSheetsConfigured(): boolean {
+export type SheetKind = 'marketing' | 'ops'
+
+const ENV_KEY: Record<SheetKind, string> = {
+  marketing: 'SHEET_ID',
+  ops: 'OPS_SHEET_ID',
+}
+
+export function isSheetsConfigured(kind: SheetKind = 'marketing'): boolean {
   return Boolean(
-    process.env.SHEET_ID &&
+    process.env[ENV_KEY[kind]] &&
       process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
       process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
   )
@@ -42,16 +49,19 @@ function buildClient(): sheets_v4.Sheets {
   return cachedClient
 }
 
-function spreadsheetId(): string {
-  const id = process.env.SHEET_ID
-  if (!id) throw new SheetsConfigError('Missing SHEET_ID env var.')
+function spreadsheetId(kind: SheetKind): string {
+  const id = process.env[ENV_KEY[kind]]
+  if (!id) throw new SheetsConfigError(`Missing ${ENV_KEY[kind]} env var.`)
   return id
 }
 
-export async function readRange(range: string): Promise<string[][]> {
+export async function readRange(
+  range: string,
+  kind: SheetKind = 'marketing',
+): Promise<string[][]> {
   const sheets = buildClient()
   const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: spreadsheetId(),
+    spreadsheetId: spreadsheetId(kind),
     range,
     valueRenderOption: 'UNFORMATTED_VALUE',
     dateTimeRenderOption: 'FORMATTED_STRING',
@@ -59,4 +69,24 @@ export async function readRange(range: string): Promise<string[][]> {
 
   const values = (res.data.values ?? []) as unknown[][]
   return values.map((row) => row.map((cell) => (cell == null ? '' : String(cell))))
+}
+
+export async function listSheetTitles(
+  kind: SheetKind = 'marketing',
+): Promise<string[]> {
+  const sheets = buildClient()
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId: spreadsheetId(kind),
+    fields: 'sheets.properties.title',
+  })
+  const list = res.data.sheets ?? []
+  return list
+    .map((s) => s.properties?.title)
+    .filter((t): t is string => typeof t === 'string')
+}
+
+export function spreadsheetUrl(kind: SheetKind): string {
+  const id = process.env[ENV_KEY[kind]]
+  if (!id) return ''
+  return `https://docs.google.com/spreadsheets/d/${id}/edit`
 }

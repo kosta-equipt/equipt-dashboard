@@ -4,7 +4,10 @@ import { RefreshButton } from './RefreshButton'
 import { ThemeToggle } from './ThemeToggle'
 import { WeatherChip } from './WeatherChip'
 import { LiveClock } from './LiveClock'
+import { SheetLink } from './SheetLink'
+import { HeaderQuote } from './HeaderQuote'
 import { getDohaWeather } from '@/lib/weather'
+import { spreadsheetUrl } from '@/lib/sheets/client'
 
 type HeaderProps = {
   fetchedAt: string | null
@@ -13,6 +16,8 @@ type HeaderProps = {
 
 export async function Header({ fetchedAt, configured }: HeaderProps) {
   const weather = await getDohaWeather()
+  const marketingUrl = spreadsheetUrl('marketing')
+  const opsUrl = spreadsheetUrl('ops')
 
   return (
     <header className="border-b border-line bg-bone/80 backdrop-blur dark:border-line-dark dark:bg-bone-dark/80">
@@ -29,10 +34,12 @@ export async function Header({ fetchedAt, configured }: HeaderProps) {
         <div className="flex items-center gap-2">
           <WeatherChip snapshot={weather} />
           <LiveClock />
+          <SheetLink marketingUrl={marketingUrl} opsUrl={opsUrl} />
           <RefreshButton fetchedAt={fetchedAt} disabled={!configured} />
           <ThemeToggle />
         </div>
       </div>
+      <HeaderQuote />
     </header>
   )
 }
